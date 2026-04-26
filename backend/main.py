@@ -71,13 +71,26 @@ def create_task(task: CreateTask) -> Task:
 
 @app.delete("/tasks/{task_id}")
 def delete_task(task_id: int):
-    conn = get_connection()
-    cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-    conn.commit()
-    conn.close()
-    if cursor.rowcount == 0:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return {"success": True}
+    conn = None
+    try:
+        conn = get_connection()
+        # Check if task exists before deletion
+        cursor = conn.execute("SELECT id FROM tasks WHERE id = ?", (task_id,))
+        if cursor.fetchone() is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        # Delete the task
+        conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+        conn.commit()
+        
+        return {"message": "Task deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Database error")
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.get("/")
